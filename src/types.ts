@@ -1,23 +1,10 @@
-/**
- * Type definitions for the LLM chat application.
- */
-
 export interface Env {
-	/**
-	 * Binding for the Workers AI API.
-	 */
-	AI: Ai;
-
-	/**
-	 * Binding for static assets.
-	 */
-	ASSETS: { fetch: (request: Request) => Promise<Response> };
-}
-
-/**
- * Represents a chat message.
- */
-export interface ChatMessage {
-	role: "system" | "user" | "assistant";
-	content: string;
+ ASSETS: { fetch(request: Request): Promise<Response> };
+ ROUTER_API_KEY?: string;
+ OPENROUTER_API_KEY?: string;
+ OLLAMA_BASE_URL?: string;
+ OLLAMA_API_KEY?: string;
+ CF_ACCOUNT_ID?: string;
+ CF_GATEWAY_ID?: string;
+ CF_AIG_TOKEN?: string;
 }

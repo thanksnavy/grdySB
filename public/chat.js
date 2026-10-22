@@ -1,230 +1,83 @@
-/**
- * LLM Chat App Frontend
- *
- * Handles the chat UI interactions and communication with the backend API.
- */
-
-// DOM elements
-const chatMessages = document.getElementById("chat-messages");
-const userInput = document.getElementById("user-input");
-const sendButton = document.getElementById("send-button");
-const typingIndicator = document.getElementById("typing-indicator");
-
-// Chat state
-let chatHistory = [
-	{
-		role: "assistant",
-		content:
-			"Hello! I'm an LLM chat app powered by Cloudflare Workers AI. How can I help you today?",
-	},
-];
-let isProcessing = false;
-
-// Auto-resize textarea as user types
-userInput.addEventListener("input", function () {
-	this.style.height = "auto";
-	this.style.height = this.scrollHeight + "px";
-});
-
-// Send message on Enter (without Shift)
-userInput.addEventListener("keydown", function (e) {
-	if (e.key === "Enter" && !e.shiftKey) {
-		e.preventDefault();
-		sendMessage();
-	}
-});
-
-// Send button click handler
-sendButton.addEventListener("click", sendMessage);
-
-/**
- * Sends a message to the chat API and processes the response
- */
-async function sendMessage() {
-	const message = userInput.value.trim();
-
-	// Don't send empty messages
-	if (message === "" || isProcessing) return;
-
-	// Disable input while processing
-	isProcessing = true;
-	userInput.disabled = true;
-	sendButton.disabled = true;
-
-	// Add user message to chat
-	addMessageToChat("user", message);
-
-	// Clear input
-	userInput.value = "";
-	userInput.style.height = "auto";
-
-	// Show typing indicator
-	typingIndicator.classList.add("visible");
-
-	// Add message to history
-	chatHistory.push({ role: "user", content: message });
-
-	try {
-		// Create new assistant response element
-		const assistantMessageEl = document.createElement("div");
-		assistantMessageEl.className = "message assistant-message";
-		assistantMessageEl.innerHTML = "<p></p>";
-		chatMessages.appendChild(assistantMessageEl);
-		const assistantTextEl = assistantMessageEl.querySelector("p");
-
-		// Scroll to bottom
-		chatMessages.scrollTop = chatMessages.scrollHeight;
-
-		// Send request to API
-		const response = await fetch("/api/chat", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
-				messages: chatHistory,
-			}),
-		});
-
-		// Handle errors
-		if (!response.ok) {
-			throw new Error("Failed to get response");
-		}
-		if (!response.body) {
-			throw new Error("Response body is null");
-		}
-
-		// Process streaming response
-		const reader = response.body.getReader();
-		const decoder = new TextDecoder();
-		let responseText = "";
-		let buffer = "";
-		const flushAssistantText = () => {
-			assistantTextEl.textContent = responseText;
-			chatMessages.scrollTop = chatMessages.scrollHeight;
-		};
-
-		let sawDone = false;
-		while (true) {
-			const { done, value } = await reader.read();
-
-			if (done) {
-				// Process any remaining complete events in buffer
-				const parsed = consumeSseEvents(buffer + "\n\n");
-				for (const data of parsed.events) {
-					if (data === "[DONE]") {
-						break;
-					}
-					try {
-						const jsonData = JSON.parse(data);
-						// Handle both Workers AI format (response) and OpenAI format (choices[0].delta.content)
-						let content = "";
-						if (
-							typeof jsonData.response === "string" &&
-							jsonData.response.length > 0
-						) {
-							content = jsonData.response;
-						} else if (jsonData.choices?.[0]?.delta?.content) {
-							content = jsonData.choices[0].delta.content;
-						}
-						if (content) {
-							responseText += content;
-							flushAssistantText();
-						}
-					} catch (e) {
-						console.error("Error parsing SSE data as JSON:", e, data);
-					}
-				}
-				break;
-			}
-
-			// Decode chunk
-			buffer += decoder.decode(value, { stream: true });
-			const parsed = consumeSseEvents(buffer);
-			buffer = parsed.buffer;
-			for (const data of parsed.events) {
-				if (data === "[DONE]") {
-					sawDone = true;
-					buffer = "";
-					break;
-				}
-				try {
-					const jsonData = JSON.parse(data);
-					// Handle both Workers AI format (response) and OpenAI format (choices[0].delta.content)
-					let content = "";
-					if (
-						typeof jsonData.response === "string" &&
-						jsonData.response.length > 0
-					) {
-						content = jsonData.response;
-					} else if (jsonData.choices?.[0]?.delta?.content) {
-						content = jsonData.choices[0].delta.content;
-					}
-					if (content) {
-						responseText += content;
-						flushAssistantText();
-					}
-				} catch (e) {
-					console.error("Error parsing SSE data as JSON:", e, data);
-				}
-			}
-			if (sawDone) {
-				break;
-			}
-		}
-
-		// Add completed response to chat history
-		if (responseText.length > 0) {
-			chatHistory.push({ role: "assistant", content: responseText });
-		}
-	} catch (error) {
-		console.error("Error:", error);
-		addMessageToChat(
-			"assistant",
-			"Sorry, there was an error processing your request.",
-		);
-	} finally {
-		// Hide typing indicator
-		typingIndicator.classList.remove("visible");
-
-		// Re-enable input
-		isProcessing = false;
-		userInput.disabled = false;
-		sendButton.disabled = false;
-		userInput.focus();
-	}
+const $ = (id) => document.getElementById(id);
+const auth = () => ({ Authorization: `Bearer ${$('router-key').value}`, 'Content-Type': 'application/json' });
+$('base-url').textContent = `${location.origin}/v1`;
+let history = [];
+function message(role, text) {
+ const el = document.createElement('div'); el.className = 'message';
+ const label = document.createElement('strong'); label.textContent = role;
+ const content = document.createElement('span'); content.textContent = text;
+ el.append(label, content); $('chat-messages').append(el); return content;
 }
-
-/**
- * Helper function to add message to chat
- */
-function addMessageToChat(role, content) {
-	const messageEl = document.createElement("div");
-	messageEl.className = `message ${role}-message`;
-	messageEl.innerHTML = `<p>${content}</p>`;
-	chatMessages.appendChild(messageEl);
-
-	// Scroll to bottom
-	chatMessages.scrollTop = chatMessages.scrollHeight;
+$('connect').onclick = async () => {
+ try {
+  const res = await fetch('/api/connections', { headers: auth() }); const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || 'Connection failed');
+  $('connection-status').textContent = `OpenRouter: ${data.providers.openrouter ? 'configured' : 'missing key'} · Ollama: ${data.providers.ollama ? 'configured' : 'missing URL'} · AI Gateway: ${data.gateway ? 'enabled for OpenRouter' : 'disabled'}. Configuration does not verify provider access.`;
+ } catch (err) { $('connection-status').textContent = err.message; }
+};
+$('chat-form').onsubmit = async (event) => {
+ event.preventDefault(); const text = $('user-input').value.trim(); if (!text) return;
+ const button = $('send-button'); if (button.disabled) return;
+ button.disabled = true; $('chat-status').textContent = 'Routing…';
+ message('you', text); const output = message('assistant', '');
+ const pending = [...history, { role: 'user', content: text }];
+ try {
+  const res = await fetch('/v1/chat/completions', { method: 'POST', headers: auth(), body: JSON.stringify({ model: $('model').value.trim(), messages: pending, stream: true }) });
+  if (!res.ok) { const data = await res.json(); throw new Error(data.error?.message || 'Request failed'); }
+  if (!res.body) throw new Error('Provider returned no body');
+  let answer = '';
+  if (!(res.headers.get('content-type') || '').includes('text/event-stream')) {
+   const data = await res.json(); if (data.error) throw new Error(data.error.message || 'Provider error');
+   answer = data.choices?.[0]?.message?.content || ''; output.textContent = answer;
+  } else {
+   const reader = res.body.getReader(), decoder = new TextDecoder(); let buffer = '', ended = false;
+   const consume = () => {
+    let boundary;
+    while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+     const frame = buffer.slice(0,boundary); buffer = buffer.slice(boundary+2);
+     const data = frame.split('\n').filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n');
+     if (!data) continue;
+     if (data === '[DONE]') { ended = true; return; }
+     const chunk = JSON.parse(data); if (chunk.error) throw new Error(chunk.error.message || 'Provider error');
+     answer += chunk.choices?.[0]?.delta?.content || ''; output.textContent = answer;
+     $('chat-messages').scrollTop = $('chat-messages').scrollHeight;
+    }
+   };
+   try {
+    while (!ended) { const {done,value} = await reader.read(); buffer += decoder.decode(value,{stream:!done}); buffer = buffer.replace(/\r\n/g,'\n'); if (done) buffer += '\n\n'; consume(); if (done) break; }
+   } finally { await reader.cancel(); reader.releaseLock(); }
+  }
+  if (!answer) throw new Error('No text response returned. Use a chat model in this playground.');
+  history = [...pending,{role:'assistant',content:answer}]; $('user-input').value = ''; $('chat-status').textContent = 'Complete';
+ } catch(err) { $('chat-status').textContent = err.message; }
+ finally { button.disabled = false; }
+};
+function validateLibrary(value) {
+ if (!Array.isArray(value) || value.length > 200) throw new Error('Expected an array of up to 200 entries.');
+ return value.map(item => {
+  if (!item || !['mcp','repo','skill'].includes(item.type) || typeof item.name !== 'string' || !item.name.trim() || item.name.length > 120 || typeof item.url !== 'string') throw new Error('Each entry needs type (mcp, repo, skill), name, and HTTPS url.');
+  const url = new URL(item.url); if (url.protocol !== 'https:' || url.username || url.password) throw new Error('Use HTTPS URLs without embedded credentials.');
+  return {type:item.type,name:item.name,url:url.href};
+ });
 }
-
-function consumeSseEvents(buffer) {
-	let normalized = buffer.replace(/\r/g, "");
-	const events = [];
-	let eventEndIndex;
-	while ((eventEndIndex = normalized.indexOf("\n\n")) !== -1) {
-		const rawEvent = normalized.slice(0, eventEndIndex);
-		normalized = normalized.slice(eventEndIndex + 2);
-
-		const lines = rawEvent.split("\n");
-		const dataLines = [];
-		for (const line of lines) {
-			if (line.startsWith("data:")) {
-				dataLines.push(line.slice("data:".length).trimStart());
-			}
-		}
-		if (dataLines.length === 0) continue;
-		events.push(dataLines.join("\n"));
-	}
-	return { events, buffer: normalized };
+let library = [];
+try { library = validateLibrary(JSON.parse(localStorage.getItem('relay-library') || '[]')); } catch { $('library-status').textContent = 'Saved library could not be read. Import a valid library to replace it.'; }
+function render() {
+ $('library-items').replaceChildren();
+ if (!library.length) { const p = document.createElement('p'); p.textContent = 'No integrations yet. Import a JSON library to get started.'; $('library-items').append(p); }
+ library.forEach((entry,index) => {
+  const card = document.createElement('article'), type = document.createElement('small'), title = document.createElement('h3'), link = document.createElement('a'), remove = document.createElement('button');
+  type.textContent = entry.type.toUpperCase(); title.textContent = entry.name; link.textContent = 'Open source ↗'; link.href = entry.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; remove.textContent = 'Remove';
+  remove.onclick = () => { const next = library.filter((_,i) => i !== index); try { localStorage.setItem('relay-library',JSON.stringify(next)); library = next; render(); } catch { $('library-status').textContent = 'Browser storage is unavailable.'; } };
+  card.append(type,title,link,document.createElement('br'),remove); $('library-items').append(card);
+ });
 }
+$('import').onchange = async (event) => {
+ try {
+  const file = event.target.files[0]; if (!file) return; if (file.size > 262144) throw new Error('Import must be under 256 KB.');
+  const next = validateLibrary(JSON.parse(await file.text())); localStorage.setItem('relay-library',JSON.stringify(next)); library = next; render(); $('library-status').textContent = `Imported ${library.length} definitions. Previous library replaced.`;
+ } catch(err) { $('library-status').textContent = err.message; }
+ event.target.value = '';
+};
+$('export').onclick = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(library,null,2)],{type:'application/json'})); const a = document.createElement('a'); a.href = url; a.download = 'relay-library.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url),1000); };
+render();
