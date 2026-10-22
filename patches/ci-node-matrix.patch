@@ -1,0 +1,26 @@
+diff --git a/.github/workflows/node.js.yml b/.github/workflows/node.js.yml
+index 2284b93..8a82398 100644
+--- a/.github/workflows/node.js.yml
++++ b/.github/workflows/node.js.yml
+@@ -16,7 +16,10 @@ jobs:
+ 
+     strategy:
+       matrix:
+-        node-version: [18.x, 20.x, 22.x]
++        # wrangler@4 declares engines >=22.0.0 and vitest@4 declares
++        # ^20.0.0 || ^22.0.0 || >=24.0.0, so 18.x and 20.x cannot satisfy
++        # both. Node 18 is also past end-of-life.
++        node-version: [22.x, 24.x]
+         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+ 
+     steps:
+@@ -27,5 +30,8 @@ jobs:
+         node-version: ${{ matrix.node-version }}
+         cache: 'npm'
+     - run: npm ci
+-    - run: npm run build --if-present
++    # The project's real verification: tsc --noEmit plus a wrangler dry-run
++    # bundle. Replaces the previous `npm run build --if-present`, which was a
++    # silent no-op because this package defines no build script.
++    - run: npm run check
+     - run: npm test

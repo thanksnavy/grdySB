@@ -1,0 +1,38 @@
+# Local development secrets for `wrangler dev`.
+#
+# Copy this file to `.dev.vars` (which is gitignored) and fill in real values:
+#
+#   cp .dev.vars.example .dev.vars
+#
+# For deployed environments use `npx wrangler secret put <NAME>` instead —
+# never commit real values, and never put secrets in wrangler.jsonc "vars".
+
+# ---------------------------------------------------------------------------
+# Optional: AI Gateway routing
+# ---------------------------------------------------------------------------
+# When BOTH of these are set, requests are proxied to your AI Gateway's
+# OpenAI-compatible endpoint, which enables multi-provider routing
+# ({provider}/{model}, including openrouter/... and dynamic/{route}), caching,
+# rate limiting, spend limits, guardrails and unified billing.
+#
+# When either is missing, the Worker falls back to the Workers AI binding, so
+# the app still works with no gateway configured.
+#
+# These two are not secret and may instead live in wrangler.jsonc "vars".
+# CLOUDFLARE_ACCOUNT_ID=your-account-id
+# AI_GATEWAY_ID=your-gateway-id
+
+# Token for an authenticated AI Gateway. Sent as `cf-aig-authorization`.
+# Required if your gateway has authentication enabled.
+# CF_AIG_TOKEN=your-gateway-token
+
+# ---------------------------------------------------------------------------
+# Optional: router access control
+# ---------------------------------------------------------------------------
+# The API key clients must present as `Authorization: Bearer <key>`.
+# This is the value you paste into Cline / Cursor / Claude Code as their
+# "API Key" when pointing them at this router.
+#
+# If unset, the router is OPEN — acceptable only behind Cloudflare Access or
+# during local development. Set it before exposing the Worker publicly.
+# ROUTER_API_KEY=generate-something-long-and-random

@@ -18,5 +18,19 @@
 	"ai": {
 		"binding": "AI"
 	},
+	// Routing configuration. Uncomment and fill in to route requests through
+	// AI Gateway (multi-provider routing, caching, rate limiting, spend caps,
+	// unified billing). Until both are set, the Worker falls back to the
+	// Workers AI binding above, so it works with no gateway configured.
+	//
+	// "vars": {
+	// 	"CLOUDFLARE_ACCOUNT_ID": "<your-account-id>",
+	// 	"AI_GATEWAY_ID": "<your-gateway-id>"
+	// },
+	//
+	// CF_AIG_TOKEN and ROUTER_API_KEY are secrets and must NEVER go in "vars".
+	// Set them with:
+	//   npx wrangler secret put CF_AIG_TOKEN
+	//   npx wrangler secret put ROUTER_API_KEY
 	"upload_source_maps": true
 }
