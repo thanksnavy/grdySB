@@ -26,6 +26,42 @@ impact.
 
 ---
 
+## Resolution status
+
+Updated after implementation. All findings except the two noted are fixed on
+branch `cline/cfns4tbv`.
+
+| ID | Status | Where |
+| --- | --- | --- |
+| B1 | ✅ Fixed | `@cloudflare/workers-types` bumped to `^5`; verified under npm 10.9.2 and 11.19.1 |
+| B2 | ✅ Fixed | `vitest.config.mts` + 60 tests across 5 files |
+| B3 | ⚠️ **Patch needs manual apply** | `patches/ci-node-matrix.patch` — the automation token lacks GitHub `workflows` permission |
+| H1 | ✅ Fixed | Per-surface system prompt policy in `src/index.ts`, with tests |
+| H2 | ✅ Fixed | `src/validate.ts` bounds count, length and body size; `max_tokens` clamped |
+| H3 | ✅ Fixed | 400/413 for client errors, 502 for upstream failures |
+| H4 | ✅ Fixed | `textContent` throughout `public/chat.js` |
+| H5 | ✅ Fixed | `trimHistory()` caps at 24 messages |
+| M1 | ✅ Fixed | `import type` in `src/index.ts` |
+| M2 | ✅ Fixed | Single `consumeStream`/`applyEvent` path |
+| M3 | ✅ Fixed | `request.signal` forwarded; Stop button + `AbortController` in the UI |
+| M4 | ✅ Fixed | `wrangler.e2e.jsonc` gains the `ai` binding |
+| M5 | ✅ Fixed | `.chat-messages` is now a flex column |
+| M6 | ✅ Fixed | Greeting lives only in `index.html` |
+| M7 | ✅ Fixed | `Allow` on 405, JSON 404s, `connection: keep-alive` removed |
+| L1 | ❌ Not done | Still no `LICENSE` file |
+| L2 | ✅ Fixed | README rewritten |
+| L3 | ⚠️ Partial | `test` no longer excluded; `"jsx": "react-jsx"` and the `node` type entry remain |
+| L4 | ❌ Not done | `nodejs_compat` still present |
+| L5 | ✅ Fixed | CI runs `npm run check` (in the patch) |
+| L6 | ❌ Not done | `worker-configuration.d.ts` still committed |
+| L7 | ⚠️ Partial | `workers-types` still uses a caret range, now matching wrangler's peer |
+
+The three remaining gaps are deliberate: a `LICENSE` is a legal decision for
+the owner, `nodejs_compat` and the committed generated types file are harmless,
+and the `jsx`/`node` tsconfig entries are cosmetic.
+
+---
+
 ## 🔴 Blockers
 
 ### B1. `npm install` fails outright — onboarding is broken ✅
