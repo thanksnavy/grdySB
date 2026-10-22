@@ -1,0 +1,32 @@
+name: Deploy workspace to Cloudflare
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-workspace-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm test -- --run
+      - run: npm run check
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+      - name: Deploy existing Worker
+        run: npx --no-install wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: '7d223fa797bb6f756723782041caf250'
+          WRANGLER_SEND_METRICS: 'false'

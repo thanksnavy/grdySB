@@ -6,6 +6,10 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "llm-chat-app-template",
 	"main": "src/index.ts",
+	"vars": {
+		"CF_ACCOUNT_ID": "7d223fa797bb6f756723782041caf250",
+		"CF_GATEWAY_ID": "grdygateway"
+	},
 	"compatibility_date": "2025-10-08",
 	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 	"assets": {
@@ -14,9 +18,6 @@
 	},
 	"observability": {
 		"enabled": true
-	},
-	"ai": {
-		"binding": "AI"
 	},
 	"upload_source_maps": true
 }
