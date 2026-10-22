@@ -42,13 +42,48 @@ npm error peerOptional @"^5.20260921.1" from wrangler@4.136.1
 ```
 
 `README.md:48` instructs new users to run `npm install` as step 2, so the
-documented first-run path fails. Only `npm ci` works, because it replays the
-committed lockfile rather than re-resolving.
+documented first-run path fails.
+
+**`npm ci` is also affected — this breaks deploys, not just local setup.**
+Confirmed by a real Cloudflare Workers Build log (`npm clean-install`,
+npm@10.9.2, node@24.21.0), which fails with the identical error and aborts the
+deploy at `Failed: error occurred while installing tools or dependencies`.
+
+The reason `npm ci` fails is version-dependent, and worth understanding because
+it makes the bug look intermittent:
+
+| npm | `npm ci` against the committed lockfile |
+| --- | --- |
+| 10.9.2 (Cloudflare build env) | ❌ ERESOLVE |
+| 11.19.1 | ✅ exit 0 |
+
+npm 11 tolerates an unsatisfied **`peerOptional`** constraint; npm 10 treats it
+as fatal. So the repository installs fine on a developer's up-to-date machine
+and fails only in CI/deploy — the worst possible failure mode. Reproduced
+locally by pinning `npx npm@10.9.2 clean-install`, which yields the same error
+verbatim.
+
+The root cause is that the explicit root declaration *fights* wrangler's own
+peer: `wrangler@4.136.1` pulls `@cloudflare/workers-types@5.20261022.1`, so the
+root's `^4` range cannot be satisfied alongside it.
 
 **Fix (applied and verified on this branch, commit `7060ee4`):** bump to
-`"@cloudflare/workers-types": "^5.20260921.1"`. After the change `npm install`
-resolves cleanly and `tsc --noEmit` still passes against `5.20261022.1` with
-**no source changes required**.
+`"@cloudflare/workers-types": "^5.20260921.1"`. Verified under **both** npm
+10.9.2 and 11.19.1: `clean-install` exits 0 and `tsc --noEmit` passes against
+`5.20261022.1` with **no source changes required**.
+
+*Alternative considered and rejected:* deleting `@cloudflare/workers-types`
+entirely also fixes the conflict (verified: `npm ci` and `tsc` both exit 0,
+because wrangler's `peerOptional` then auto-installs v5). It is tempting since
+`tsconfig.json:39` already points at the generated `worker-configuration.d.ts`,
+which independently declares `Ai` (line 10505), `AiTextGenerationInput`,
+`ExportedHandler` and `ExecutionContext`. Rejected because it makes the type
+dependency *implicit* — it would then rely on npm auto-installing an
+**optional** peer, which is exactly the behaviour that varies across npm
+versions and flags (`--legacy-peer-deps` would silently drop it and break
+typechecking). Keeping the dependency explicit is the more robust choice, and
+the bump is a one-line change.
+
 
 ### B2. CI fails on every push and pull request ✅
 
@@ -389,12 +424,15 @@ Commands run against a clean `npm ci` install (Node v24.22.1):
 
 | Command | Result |
 | --- | --- |
-| `npm ci` | ✅ exit 0 |
-| `npm install` (bare) | ❌ ERESOLVE (B1) |
+| `npm ci` (npm 11.19.1) | ✅ exit 0 |
+| `npx npm@10.9.2 clean-install` | ❌ ERESOLVE — matches Cloudflare build log (B1) |
+| `npm install` (bare, npm 11) | ❌ ERESOLVE (B1) |
+| `npx npm@10.9.2 clean-install` after B1 fix | ✅ exit 0 |
 | `npm install` after B1 fix | ✅ exit 0 |
-| `npx tsc --noEmit` | ✅ exit 0 (both workers-types v4 and v5) |
+| `npx tsc --noEmit` | ✅ exit 0 (workers-types v4, v5, and absent) |
 | `npx wrangler deploy --dry-run` | ✅ exit 0 — 20.59 KiB / 5.53 KiB gzip |
 | `npx vitest run` | ❌ exit 1 — "No test files found" (B2) |
 | Worker handler probes (mocked `AI`/`ASSETS`) | 9/9 reproduced H1, H2, H3, M7 |
 | Native Node type-stripping of `src/index.ts` | ❌ SyntaxError (M1) |
 | Whitespace-normalized diff of `chat.js` blocks | ✅ 19 identical lines (M2) |
+| `npm ls @cloudflare/workers-types` (dep removed) | ✅ v5 still resolved transitively via wrangler |
